@@ -1,0 +1,105 @@
+<html>
+<head>
+<title>NLP in arXiv</title>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<link href="https://fonts.googleapis.com/css?family=Source+Serif+Pro" rel="stylesheet">
+<style>
+  body { font-family: "Source Serif Pro"; }
+  
+  path.area { fill: #2ca25f;}
+  div.topic { clear: both; background-color: #dddddd; border-radius: 20px; padding: 20px; margin: 20px;}
+  .axis path { stroke: none; }
+  .axis line { stroke: none; }
+  .axis text { fill: #aaaaaa; }
+
+  @media only screen and (min-device-width: 600px) {
+    svg { float: right; width: 45%; }
+    div.words { width: 50%; height: 200; }
+  }
+  @media only screen and (max-device-width: 600px) {
+    svg { width: 100%; }
+    div.words { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="intro">
+[Updated 7/2023]  Submissions to arXiv in the Computing and Language section (cs.CL) continue to rise dramatically, with pronounced seasonal spikes around pre-conference "quiet periods". What are these papers about? I grabbed all the cs.CL abstracts from the arXiv API and plotted a time series for 100 topics. The units on the y-axis are estimated token-counts. Topics are sorted by their average date, so the top rising topics are prompting, pre-training, BERT, few-shot, and distillation. The "oldest" topics are classic NLP, but also major topics from the pre-transformer era such as LSTMs/RNNs and embeddings. Topic models are down there too, but as you can see, they still work 😜.
+</div>
+
+<div id="topics">
+</div>
+
+<script>
+var topicWords, rawTagCounts, topicTagCounts;
+var earliestDate = new Date("2010-01-01");
+var latestDate = new Date("2023-07-01");
+  
+var rightPadding = 40;
+var bottomPadding = 20;
+var height = 75;
+var width = 350; //window.innerWidth - 3 * rightPadding;
+
+
+var xScale = d3.scaleTime().domain([earliestDate, latestDate]).range([0, width]);
+
+d3.queue()
+  .defer(d3.tsv, "topic_words.tsv")
+  .defer(d3.tsv, "tag_topics.tsv", tagToDate)
+  .await(initialize);
+  
+function tagToDate(row) {
+  row.Topic = Number(row.Topic);
+  row.Count = Number(row.Count) / 10;
+  row.Date = new Date(row.Tag + "-01");
+  return row;
+}
+
+function initialize(error, _topic_words, _tag_topics) {
+  topicWords = _topic_words;
+  rawTagCounts = _tag_topics.filter(d => d.Date >= earliestDate);
+  topicTagCounts = d3.nest().key(d => d.Topic).entries(rawTagCounts)
+  
+    topicMaxes = topicTagCounts.map(d => d3.max(d.values, m => m.Count));
+    topicMeans = topicTagCounts.map(d => d3.mean(d.values, m => m.Count * xScale(m.Date)) / d3.sum(d.values, m => m.Count));
+  
+  show();
+}
+
+function show() {
+  d3.select("#topics").selectAll("div").remove();
+  
+    //var sortedTopics = topicMaxes.map((d, i) => [i, d]).sort((a, b) => b[1] - a[1]);
+    var sortedTopics = topicMeans.map((d, i) => [i, d]).sort((a, b) => b[1] - a[1]);
+  
+  for (var i = 0; i < sortedTopics.length; i++) {
+    var topic = sortedTopics[i][0];
+    var div = d3.select("#topics").append("div");
+    div.attr("class", "topic");
+    
+    console.log(div.style("width"));
+    
+    var svg = div.append("svg")
+    //.attr("width", width)
+    //.attr("height", height + bottomPadding)
+    .attr("viewBox", "0 0 " + (width + rightPadding) + " " + (height + bottomPadding));
+    //.attr("preserveAspectRatio", "xMinYMid");
+    //.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+    
+    var yScale = d3.scaleLinear().domain([0, topicMaxes[topic]]).range([height, 0]);
+    var path = d3.area().x(d => xScale(d.Date))
+    .y0(yScale(0))
+    .y1(d => yScale(d.Count));
+    
+    svg.append("path").attr("class", "area").attr("d", path(topicTagCounts[topic].values));
+    svg.append("g").attr("class", "axis").attr("transform", "translate(0," + yScale(0) + ")").call(d3.axisBottom(xScale));
+    svg.append("g").attr("class", "axis").attr("transform", "translate(" + width + ", 0)").call(d3.axisRight(yScale).ticks(5));
+    
+    div.append("div").attr("class", "words").text(topicWords[topic].Words);
+  }
+}
+
+</script>
+</body>
+</html>
