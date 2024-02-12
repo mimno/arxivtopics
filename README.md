@@ -1,9 +1,9 @@
 # Scripts to extract abstracts from arXiv's XML API
 
-Papers in arXiv are organized in categories, like `cs.CL` for computational linguistics or `cs.LG` for machine learning. To download all abstracts in a category and then extract abstracts to a tab-delimited file, run
+Papers in arXiv are organized in categories, like `cs.CL` for computational linguistics or `cs.LG` for machine learning. To download all abstracts in a category, extract abstracts sorted ascending by date to a tab-delimited file, run
 
     python get.py cs.CL
-    python parse.py cs.CL > cs.CL.tsv
+    python parse.py cs.CL | sort -k 2 > cs.CL.tsv
 
 This script follows the [arXiv API terms of use](https://info.arxiv.org/help/api/tou.html), which does not allow more than one query per three seconds. You will stop getting results if you go faster.
 
